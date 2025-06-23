@@ -7,6 +7,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "memory")
 
 try:
     from sqlalchemy import create_engine, Column, DateTime, Text, func
+    from sqlalchemy.dialects.postgresql import insert
     from sqlalchemy.orm import declarative_base, sessionmaker
     from sqlalchemy.dialects.postgresql import UUID
     from pgvector.sqlalchemy import Vector
@@ -22,7 +23,7 @@ if Base:
     class MemoryORM(Base):
         __tablename__ = "memories"
         id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-        text = Column(Text, nullable=False)
+        text = Column(Text, nullable=False, unique=True)
         embedding = Column(Vector(1536))
         ts = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -45,14 +46,27 @@ def init_db() -> None:
 def save_memory(text: str, embedding: List[float]) -> str:
     text = " ".join(text.split())[:8000]
     if DATABASE_URL == "memory" or not SessionLocal:
+        for mem in _mem_store:
+            if mem["text"] == text:
+                mem["embedding"] = embedding
+                mem["ts"] = datetime.utcnow()
+                return mem["id"]
         mem_id = str(uuid.uuid4())
         _mem_store.append({"id": mem_id, "text": text, "embedding": embedding, "ts": datetime.utcnow()})
         return mem_id
     with SessionLocal() as session:
-        mem = MemoryORM(text=text, embedding=embedding)
-        session.add(mem)
+        stmt = (
+            insert(MemoryORM)
+            .values(text=text, embedding=embedding)
+            .on_conflict_do_update(
+                index_elements=[MemoryORM.text],
+                set_={"embedding": embedding, "ts": func.now()}
+            )
+            .returning(MemoryORM.id)
+        )
+        result = session.execute(stmt)
         session.commit()
-        return str(mem.id)
+        return str(result.scalar())
 
 
 def search_memories(embedding: List[float], limit: int = 5) -> List[str]:
