@@ -1,20 +1,12 @@
-FROM python:3.12-slim
-
-ARG PORT=8050
-
+FROM python:3.12-slim AS builder
 WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --prefix=/install -r requirements.txt
 
-# Install uv
-RUN pip install uv
-
-# Copy the MCP server files
+FROM python:3.12-slim
+ENV PORT=8050
+WORKDIR /app
+COPY --from=builder /install /usr/local
 COPY . .
-
-# Install packages
-RUN python -m venv .venv
-RUN uv pip install -e .
-
-EXPOSE ${PORT}
-
-# Command to run the MCP server
-CMD ["uv", "run", "src/main.py"]
+EXPOSE $PORT
+CMD ["python", "-m", "src.main"]
