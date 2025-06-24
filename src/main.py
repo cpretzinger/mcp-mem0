@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from mcp_sdk.server import MCPServer, Context
 from dotenv import load_dotenv
 
