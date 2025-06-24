@@ -36,3 +36,24 @@ Set `TRANSPORT=stdio` in `.env` and run:
 python -m src.main
 ```
 A compatible client can then communicate with the process via stdin/stdout.
+
+### SSE stream
+Connect to the server via Server-Sent Events (SSE) to receive updates. The
+current implementation emits a small `ping` message roughly once per second.
+
+Using `curl` you can watch these events:
+
+```bash
+curl -N http://localhost:8050/sse
+```
+
+Or using Python with the `httpx` package:
+
+```python
+import httpx
+
+with httpx.Client(timeout=None) as client:
+    for line in client.stream("GET", "http://localhost:8050/sse"):
+        if line:
+            print(line.decode().strip())
+```
